@@ -34,6 +34,7 @@ const NavTheme = {
   },
 };
 
+// ── Giriş Ekranı Bileşeni ─────────────────────────────────────────────────────
 function LoginScreen({ onLogin }) {
   const [user,    setUser]    = useState('');
   const [pass,    setPass]    = useState('');
@@ -100,6 +101,71 @@ function LoginScreen({ onLogin }) {
   );
 }
 
+// ── Ana Uygulama Bileşeni ──────────────────────────────────────────────────────
+export default function App() {
+  const [authed, setAuthed] = useState(false);
+
+  // Web tarayıcısında tüm sayfanın kaymasını sağlayan kapsayıcı stil
+  const webWrapperStyle = Platform.OS === 'web' ? {
+    flex: 1,
+    height: '100vh',
+    width: '100vw',
+    overflow: 'auto', // Masalar ekranında aşağı kaymayı sağlayan asıl büyü burada!
+    backgroundColor: C.bgDark,
+  } : { flex: 1 };
+
+  if (!authed) {
+    return (
+      <SafeAreaProvider>
+        <View style={webWrapperStyle}>
+          <LoginScreen onLogin={() => setAuthed(true)} />
+        </View>
+      </SafeAreaProvider>
+    );
+  }
+
+  return (
+    <SafeAreaProvider>
+      {/* Aşağıdaki View, web üzerinde tüm navigator'ı sarmalar. 
+        Böylece içindeki TablesScreen ne kadar uzun olursa olsun tarayıcı kaydırma yapar.
+      */}
+      <View style={webWrapperStyle}>
+        <NavigationContainer theme={NavTheme}>
+          <StatusBar style="light" />
+          <Stack.Navigator
+            screenOptions={{
+              headerStyle:      { backgroundColor: C.bgMid },
+              headerTintColor:  C.txtPrimary,
+              headerTitleStyle: { fontWeight: '800', fontSize: F.lg },
+              cardStyle:        { backgroundColor: C.bgDark },
+              headerBackTitleVisible: false,
+            }}
+          >
+            <Stack.Screen
+              name="Tables"
+              component={TablesScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Order"
+              component={OrderScreen}
+              options={({ route }) => ({
+                title: route.params?.tableName ?? 'Sipariş',
+              })}
+            />
+            <Stack.Screen
+              name="Admin"
+              component={AdminScreen}
+              options={{ title: 'Yönetim Paneli' }}
+            />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </View>
+    </SafeAreaProvider>
+  );
+}
+
+// ── Stiller ──────────────────────────────────────────────────────────────────
 const loginStyles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bgDark, alignItems: 'center', justifyContent: 'center' },
   card: {
@@ -138,50 +204,3 @@ const loginStyles = StyleSheet.create({
   },
   btnTxt: { color: C.bgDark, fontWeight: '800', fontSize: F.md },
 });
-
-export default function App() {
-  const [authed, setAuthed] = useState(false);
-
-  if (!authed) {
-    return (
-      <SafeAreaProvider>
-        <LoginScreen onLogin={() => setAuthed(true)} />
-      </SafeAreaProvider>
-    );
-  }
-
-  return (
-    <SafeAreaProvider>
-      <NavigationContainer theme={NavTheme}>
-        <StatusBar style="light" />
-        <Stack.Navigator
-          screenOptions={{
-            headerStyle:      { backgroundColor: C.bgMid },
-            headerTintColor:  C.txtPrimary,
-            headerTitleStyle: { fontWeight: '800', fontSize: F.lg },
-            cardStyle:        { backgroundColor: C.bgDark },
-            headerBackTitleVisible: false,
-          }}
-        >
-          <Stack.Screen
-            name="Tables"
-            component={TablesScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="Order"
-            component={OrderScreen}
-            options={({ route }) => ({
-              title: route.params?.tableName ?? 'Sipariş',
-            })}
-          />
-          <Stack.Screen
-            name="Admin"
-            component={AdminScreen}
-            options={{ title: 'Yönetim Paneli' }}
-          />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </SafeAreaProvider>
-  );
-}
