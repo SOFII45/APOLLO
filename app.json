@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Kafe POS",
+    "slug": "cafe-pos",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#1C1209"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cafe.pos"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1C1209"
+      },
+      "package": "com.cafe.pos"
+    },
+    "plugins": ["expo-font"]
+  }
+}
