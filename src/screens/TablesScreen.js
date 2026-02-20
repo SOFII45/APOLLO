@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity,
+  View, Text, TouchableOpacity,
   StyleSheet, useWindowDimensions,
   ActivityIndicator, StatusBar, ScrollView
 } from 'react-native';
@@ -34,20 +34,19 @@ function getTableStatus(t, hasItems) {
 
 export default function TablesScreen({ navigation }) {
   const { width } = useWindowDimensions();
-  const columns   = width < 480 ? 2 : width < 768 ? 3 : 4;
+  // Web'de daha stabil bir dizilim için dinamik kolon genişliği
+  const columns = width < 480 ? 2 : width < 768 ? 3 : 4;
+  const cardSize = (width - (columns + 1) * 20) / columns;
 
   const [tables,   setTables]   = useState([]);
   const [loading,  setLoading]  = useState(true);
-  const [pressing] = useState(null);
   const [pinVisible, setPinVisible] = useState(false);
 
   const orderDetails = useRef({});
 
-  // ── Data fetch ──────────────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
     try {
       const [tbl, orders] = await Promise.all([getTables(), getOpenOrders()]);
-
       const map = {};
       orders.forEach(o => { 
         if (!o.is_paid) {
@@ -60,7 +59,7 @@ export default function TablesScreen({ navigation }) {
       orderDetails.current = map;
       setTables(tbl);
     } catch {
-      // Silently ignore polling errors
+      // Polling hatalarını sessizce geç
     } finally {
       setLoading(false);
     }
@@ -76,7 +75,6 @@ export default function TablesScreen({ navigation }) {
   );
   usePolling(fetchData, 3000, focused);
 
-  // ── Press handler ───────────────────────────────────────────────────────────
   const handlePress = (table) => {
     const existingOrder = orderDetails.current[table.id];
     navigation.navigate('Order', {
@@ -84,47 +82,6 @@ export default function TablesScreen({ navigation }) {
       tableId:   table.id,
       tableName: getTableLabel(table).replace('\n', ' '),
     });
-  };
-
-  // ── Render ──────────────────────────────────────────────────────────────────
-  const renderTable = ({ item }) => {
-    const tableInfo = orderDetails.current[item.id];
-    const hasItems = tableInfo?.hasItems;
-    const { bg, border } = getTableColor(item, hasItems);
-    const isLoading = pressing === item.id;
-    const cardSize  = (width - (columns + 1) * 12) / columns;
-
-    return (
-      <TouchableOpacity
-        style={[
-          styles.card,
-          {
-            backgroundColor: bg,
-            borderColor: border,
-            width: cardSize,
-            height: cardSize * 0.82,
-          },
-          S.card,
-        ]}
-        onPress={() => handlePress(item)}
-        activeOpacity={0.78}
-        disabled={!!pressing}
-      >
-        {isLoading ? (
-          <ActivityIndicator color={C.white} size="large" />
-        ) : (
-          <>
-            <Text style={styles.cardNum}>{getTableLabel(item)}</Text>
-            <View style={[styles.statusBadge, (item.status === 'occupied' && hasItems) && styles.statusBadgeOcc]}>
-              <Text style={styles.statusTxt}>{getTableStatus(item, hasItems)}</Text>
-            </View>
-            {hasItems && (
-              <View style={styles.dotBadge} />
-            )}
-          </>
-        )}
-      </TouchableOpacity>
-    );
   };
 
   if (loading) {
@@ -140,12 +97,13 @@ export default function TablesScreen({ navigation }) {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={C.bgDark} />
 
+      {/* ÜST BAR SABİT */}
       <View style={styles.headerBar}>
         <View>
           <Text style={styles.headerTitle}>☕ Kafe POS</Text>
           <Text style={styles.headerSub}>{tables.length} masa</Text>
         </View>
-        <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '10px' }}>
+        <View style={styles.legendRow}>
           {[
             { color: C.green,  label: 'Boş' },
             { color: C.red,    label: 'Dolu' },
@@ -157,25 +115,48 @@ export default function TablesScreen({ navigation }) {
               <Text style={styles.legendTxt}>{l.label}</Text>
             </View>
           ))}
-        </div>
+        </View>
       </View>
 
-      {/* WEB İÇİN KAYDIRMA DESTEĞİ EKLENDİ */}
+      {/* ANA KAYDIRMA ALANI */}
       <ScrollView 
+        style={{ flex: 1 }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={true}
       >
-        <FlatList
-          data={tables}
-          keyExtractor={t => String(t.id)}
-          numColumns={columns}
-          key={`grid-${columns}`}
-          contentContainerStyle={styles.grid}
-          renderItem={renderTable}
-          scrollEnabled={false} // Kaydırma işlemini dıştaki ScrollView yapıyor
-        />
+        <View style={styles.gridWrapper}>
+          {tables.map((item) => {
+            const tableInfo = orderDetails.current[item.id];
+            const hasItems = tableInfo?.hasItems;
+            const { bg, border } = getTableColor(item, hasItems);
 
-        {/* ADMIN BUTONU ARTIK SAYFANIN SONUNDA VE HER ZAMAN ERİŞİLEBİLİR */}
+            return (
+              <TouchableOpacity
+                key={item.id}
+                style={[
+                  styles.card,
+                  {
+                    backgroundColor: bg,
+                    borderColor: border,
+                    width: cardSize,
+                    height: cardSize * 0.85,
+                  },
+                  S.card,
+                ]}
+                onPress={() => handlePress(item)}
+                activeOpacity={0.78}
+              >
+                <Text style={styles.cardNum}>{getTableLabel(item)}</Text>
+                <View style={[styles.statusBadge, (item.status === 'occupied' && hasItems) && styles.statusBadgeOcc]}>
+                  <Text style={styles.statusTxt}>{getTableStatus(item, hasItems)}</Text>
+                </View>
+                {hasItems && <View style={styles.dotBadge} />}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* ADMIN BUTONU - Sayfanın en altında */}
         <TouchableOpacity
           style={styles.adminBtnWeb}
           onPress={() => setPinVisible(true)}
@@ -196,9 +177,8 @@ export default function TablesScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bgDark },
-  scrollContent: { flexGrow: 1 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bgDark, gap: 12 },
-  loadTxt: { color: C.txtSecond, fontSize: F.md },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bgDark },
+  loadTxt: { color: C.txtSecond, fontSize: F.md, marginTop: 12 },
   headerBar: {
     backgroundColor: C.bgMid,
     paddingHorizontal: 16,
@@ -209,31 +189,38 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
+    zIndex: 10,
   },
-  headerTitle: { fontSize: F.xl, fontWeight: '800', color: C.txtPrimary, letterSpacing: 0.5 },
-  headerSub: { fontSize: F.sm, color: C.txtSecond, marginTop: 2 },
+  headerTitle: { fontSize: F.xl, fontWeight: '800', color: C.txtPrimary },
+  headerSub: { fontSize: F.sm, color: C.txtSecond },
+  legendRow: { flexDirection: 'row', gap: 10 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendDot:  { width: 10, height: 10, borderRadius: 5 },
   legendTxt:  { fontSize: F.xs, color: C.txtSecond },
-  grid: { padding: 12, gap: 12 },
+  
+  scrollContent: { 
+    paddingBottom: 40,
+    flexGrow: 1 
+  },
+  gridWrapper: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 10,
+    justifyContent: 'flex-start',
+  },
   card: {
-    margin: 0,
+    margin: 5,
     borderRadius: R.lg,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     padding: 10,
-    overflow: 'hidden',
   },
   cardNum: {
     color: C.white,
-    fontSize: F.xl,
+    fontSize: F.lg,
     fontWeight: '900',
     textAlign: 'center',
-    letterSpacing: 0.3,
-    lineHeight: F.xl * 1.25,
   },
   statusBadge: {
     marginTop: 8,
@@ -255,14 +242,13 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: C.white,
   },
-  // WEB İÇİN ÖZEL BUTON STİLİ
   adminBtnWeb: {
     backgroundColor: C.bgMid,
     borderRadius: R.lg,
-    paddingHorizontal: 20,
     paddingVertical: 18,
-    marginHorizontal: 16,
-    marginVertical: 30, // Altta ve üstte boşluk bırakır
+    marginHorizontal: 15,
+    marginTop: 20,
+    marginBottom: 40,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: C.border,
