@@ -2,11 +2,11 @@ import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
   StyleSheet, useWindowDimensions,
-  ActivityIndicator, Alert, StatusBar,
+  ActivityIndicator, StatusBar, ScrollView
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
-import { getTables, getOpenOrders, extractError } from '../services/api';
+import { getTables, getOpenOrders } from '../services/api';
 import { C, F, R, S } from '../constants/theme';
 import PinModal from '../components/PinModal';
 import usePolling from '../hooks/usePolling';
@@ -16,7 +16,6 @@ import usePolling from '../hooks/usePolling';
 function getTableColor(t, hasItems) {
   if (t.table_type === 'guest')    return { bg: C.purple,  border: C.purpleDark };
   if (t.table_type === 'delivery') return { bg: C.blue,    border: C.blueDark };
-  // SADECE masa 'occupied' ise VE içinde ürün (hasItems) varsa kırmızı olsun
   if (t.status === 'occupied' && hasItems) return { bg: C.red, border: C.redDark };
   return { bg: C.green, border: C.greenDark };
 }
@@ -39,10 +38,9 @@ export default function TablesScreen({ navigation }) {
 
   const [tables,   setTables]   = useState([]);
   const [loading,  setLoading]  = useState(true);
-  const [pressing, setPressing] = useState(null);
+  const [pressing] = useState(null);
   const [pinVisible, setPinVisible] = useState(false);
 
-  // Map tableId → { id: orderId, hasItems: boolean }
   const orderDetails = useRef({});
 
   // ── Data fetch ──────────────────────────────────────────────────────────────
@@ -60,7 +58,6 @@ export default function TablesScreen({ navigation }) {
         } 
       });
       orderDetails.current = map;
-
       setTables(tbl);
     } catch {
       // Silently ignore polling errors
@@ -81,7 +78,6 @@ export default function TablesScreen({ navigation }) {
 
   // ── Press handler ───────────────────────────────────────────────────────────
   const handlePress = (table) => {
-    // Tıklandığında sipariş oluşturmuyoruz, sadece bilgiyi taşıyoruz
     const existingOrder = orderDetails.current[table.id];
     navigation.navigate('Order', {
       orderId:   existingOrder ? existingOrder.id : null,
@@ -149,7 +145,7 @@ export default function TablesScreen({ navigation }) {
           <Text style={styles.headerTitle}>☕ Kafe POS</Text>
           <Text style={styles.headerSub}>{tables.length} masa</Text>
         </View>
-        <View style={styles.legendRow}>
+        <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '10px' }}>
           {[
             { color: C.green,  label: 'Boş' },
             { color: C.red,    label: 'Dolu' },
@@ -161,26 +157,33 @@ export default function TablesScreen({ navigation }) {
               <Text style={styles.legendTxt}>{l.label}</Text>
             </View>
           ))}
-        </View>
+        </div>
       </View>
 
-      <FlatList
-        data={tables}
-        keyExtractor={t => String(t.id)}
-        numColumns={columns}
-        key={`grid-${columns}`}
-        contentContainerStyle={styles.grid}
-        renderItem={renderTable}
-        showsVerticalScrollIndicator={false}
-      />
-
-      <TouchableOpacity
-        style={styles.adminBtn}
-        onPress={() => setPinVisible(true)}
-        activeOpacity={0.8}
+      {/* WEB İÇİN KAYDIRMA DESTEĞİ EKLENDİ */}
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={true}
       >
-        <Text style={styles.adminTxt}>⚙️  Admin</Text>
-      </TouchableOpacity>
+        <FlatList
+          data={tables}
+          keyExtractor={t => String(t.id)}
+          numColumns={columns}
+          key={`grid-${columns}`}
+          contentContainerStyle={styles.grid}
+          renderItem={renderTable}
+          scrollEnabled={false} // Kaydırma işlemini dıştaki ScrollView yapıyor
+        />
+
+        {/* ADMIN BUTONU ARTIK SAYFANIN SONUNDA VE HER ZAMAN ERİŞİLEBİLİR */}
+        <TouchableOpacity
+          style={styles.adminBtnWeb}
+          onPress={() => setPinVisible(true)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.adminTxt}>⚙️  Admin Paneline Giriş Yap</Text>
+        </TouchableOpacity>
+      </ScrollView>
 
       <PinModal
         visible={pinVisible}
@@ -193,6 +196,7 @@ export default function TablesScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bgDark },
+  scrollContent: { flexGrow: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bgDark, gap: 12 },
   loadTxt: { color: C.txtSecond, fontSize: F.md },
   headerBar: {
@@ -210,11 +214,10 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: F.xl, fontWeight: '800', color: C.txtPrimary, letterSpacing: 0.5 },
   headerSub: { fontSize: F.sm, color: C.txtSecond, marginTop: 2 },
-  legendRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendDot:  { width: 10, height: 10, borderRadius: 5 },
   legendTxt:  { fontSize: F.xs, color: C.txtSecond },
-  grid: { padding: 12, paddingBottom: 90, gap: 12 },
+  grid: { padding: 12, gap: 12 },
   card: {
     margin: 0,
     borderRadius: R.lg,
@@ -252,17 +255,18 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: C.white,
   },
-  adminBtn: {
-    position: 'absolute',
-    bottom: 20,
-    right: 16,
-    backgroundColor: C.bgLight,
-    borderRadius: R.full,
+  // WEB İÇİN ÖZEL BUTON STİLİ
+  adminBtnWeb: {
+    backgroundColor: C.bgMid,
+    borderRadius: R.lg,
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 18,
+    marginHorizontal: 16,
+    marginVertical: 30, // Altta ve üstte boşluk bırakır
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: C.border,
     ...S.card,
   },
-  adminTxt: { color: C.txtPrimary, fontWeight: '700', fontSize: F.sm },
+  adminTxt: { color: C.txtPrimary, fontWeight: '700', fontSize: F.md },
 });
