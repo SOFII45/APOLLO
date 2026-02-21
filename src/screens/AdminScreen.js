@@ -25,6 +25,7 @@ export default function AdminScreen() {
   const [activeTab, setActiveTab] = useState('products');
 
   return (
+    // WEB ÇİFT ÇUBUK FİX: Root ekranı donduruyoruz
     <View style={[styles.root, Platform.OS === 'web' && { height: '100vh', overflow: 'hidden' }]}>
       <View style={styles.tabBarWrapper}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabBar} contentContainerStyle={styles.tabBarContent}>
@@ -36,10 +37,12 @@ export default function AdminScreen() {
         </ScrollView>
       </View>
       
+      {/* ANA KAYDIRICI: Web'de tek çubuğu bu sağlar */}
       <ScrollView 
         style={{ flex: 1 }} 
         contentContainerStyle={styles.mainScrollContent}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={Platform.OS === 'web'}
       >
         {activeTab === 'products'   && <ProductsTab />}
         {activeTab === 'categories' && <CategoriesTab />}
@@ -50,18 +53,17 @@ export default function AdminScreen() {
   );
 }
 
-// ── ÜRÜNLER (Filtreleme & Tüm CRUD Fonksiyonları Korundu) ───────────────────────
+// ── PRODUCTS TAB (FİLTRE + TÜM CRUD + YENİLEME) ───────────────────────────────
 function ProductsTab() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  
   const [newName, setNewName] = useState('');
   const [newPrice, setNewPrice] = useState('');
   const [newCatId, setNewCatId] = useState(null);
   const [editingId, setEditingId] = useState(null);
-  const [selectedFilterCat, setSelectedFilterCat] = useState(null); // FİLTRELEME GERİ GELDİ
+  const [selectedFilterCat, setSelectedFilterCat] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -76,8 +78,7 @@ function ProductsTab() {
 
   const handleSave = async () => {
     if (!newName.trim() || !newPrice || !newCatId) {
-      Alert.alert("Hata", "Lütfen tüm alanları doldurun.");
-      return;
+      Alert.alert("Hata", "Lütfen tüm alanları doldurun."); return;
     }
     setSaving(true);
     try {
@@ -103,10 +104,10 @@ function ProductsTab() {
   return (
     <View>
       <View style={styles.card}>
-        <Text style={styles.formTitle}>{editingId ? "🎁 Düzenle" : "🆕 Yeni Ürün"}</Text>
+        <Text style={styles.formTitle}>{editingId ? "🎁 Ürünü Düzenle" : "🆕 Yeni Ürün Ekle"}</Text>
         <TextInput style={styles.input} placeholder="Ürün Adı" value={newName} onChangeText={setNewName} placeholderTextColor={C.txtDim} />
         <TextInput style={styles.input} placeholder="Fiyat" value={newPrice} onChangeText={setNewPrice} keyboardType="numeric" placeholderTextColor={C.txtDim} />
-        <Text style={styles.label}>Kategori Seç (Ekleme İçin):</Text>
+        <Text style={styles.label}>Ekleme Kategorisi:</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 8}}>
           {categories.map(c => (
             <TouchableOpacity key={c.id} onPress={() => setNewCatId(c.id)} style={[styles.catBtnSmall, newCatId === c.id && styles.catSelectBtnActive]}>
@@ -114,20 +115,21 @@ function ProductsTab() {
             </TouchableOpacity>
           ))}
         </ScrollView>
-        <TouchableOpacity style={styles.primaryBtn} onPress={handleSave} disabled={saving}>
-          <Text style={styles.primaryBtnTxt}>{editingId ? "GÜNCELLE" : "KAYDET"}</Text>
-        </TouchableOpacity>
+        <View style={{flexDirection: 'row', gap: 6}}>
+          <TouchableOpacity style={[styles.primaryBtn, {flex: 2}]} onPress={handleSave} disabled={saving}><Text style={styles.primaryBtnTxt}>{editingId ? "GÜNCELLE" : "KAYDET"}</Text></TouchableOpacity>
+          {editingId && (
+            <TouchableOpacity style={[styles.primaryBtn, {flex: 1, backgroundColor: C.bgLight}]} onPress={() => {setEditingId(null); setNewName(''); setNewPrice('');}}>
+              <Text style={[styles.primaryBtnTxt, {color: C.txtPrimary}]}>İPTAL</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
-      <Text style={styles.label}>Listeleme Filtresi:</Text>
+      <Text style={styles.label}>Filtrele:</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 10}}>
-        <TouchableOpacity onPress={() => setSelectedFilterCat(null)} style={[styles.catBtnSmall, !selectedFilterCat && styles.catSelectBtnActive]}>
-          <Text style={[styles.catSelectTxt, !selectedFilterCat && styles.catSelectTxtActive]}>Hepsi</Text>
-        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setSelectedFilterCat(null)} style={[styles.catBtnSmall, !selectedFilterCat && styles.catSelectBtnActive]}><Text style={[styles.catSelectTxt, !selectedFilterCat && styles.catSelectTxtActive]}>Hepsi</Text></TouchableOpacity>
         {categories.map(c => (
-          <TouchableOpacity key={c.id} onPress={() => setSelectedFilterCat(c.id)} style={[styles.catBtnSmall, selectedFilterCat === c.id && styles.catSelectBtnActive]}>
-            <Text style={[styles.catSelectTxt, selectedFilterCat === c.id && styles.catSelectTxtActive]}>{c.name}</Text>
-          </TouchableOpacity>
+          <TouchableOpacity key={c.id} onPress={() => setSelectedFilterCat(c.id)} style={[styles.catBtnSmall, selectedFilterCat === c.id && styles.catSelectBtnActive]}><Text style={[styles.catSelectTxt, selectedFilterCat === c.id && styles.catSelectTxtActive]}>{c.name}</Text></TouchableOpacity>
         ))}
       </ScrollView>
 
@@ -135,13 +137,13 @@ function ProductsTab() {
         <View key={p.id} style={styles.itemCard}>
           <View style={{ flex: 1 }}><Text style={styles.productName}>{p.name}</Text><Text style={styles.priceAmt}>{fmt(p.price)}</Text></View>
           <View style={{flexDirection: 'row', gap: 15}}>
-              <TouchableOpacity onPress={() => {setEditingId(p.id); setNewName(p.name); setNewPrice(p.price.toString()); setNewCatId(p.category);}}><Text style={{fontSize: 18}}>✏️</Text></TouchableOpacity>
-              <TouchableOpacity onPress={() => {
-                Alert.alert('Sil', 'Emin misin?', [
-                  {text: 'Hayır'},
-                  {text: 'Evet', onPress: async () => { try { await deleteProduct(p.id); load(); } catch(e) { Alert.alert("Hata", "Silinemedi"); } }}
-                ]);
-              }}><Text style={{fontSize: 18}}>🗑️</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => {setEditingId(p.id); setNewName(p.name); setNewPrice(p.price.toString()); setNewCatId(p.category);}}><Text style={{fontSize: 18}}>✏️</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => {
+              Alert.alert('Sil', 'Emin misin?', [
+                {text: 'Vazgeç'},
+                {text: 'Sil', onPress: async () => { try { await deleteProduct(p.id); load(); } catch(e) { Alert.alert("Hata", "Silinemedi"); } }}
+              ]);
+            }}><Text style={{fontSize: 18}}>🗑️</Text></TouchableOpacity>
           </View>
         </View>
       ))}
@@ -149,7 +151,7 @@ function ProductsTab() {
   );
 }
 
-// ── KATEGORİLER (CRUD Korundu) ────────────────────────────────────────────────
+// ── CATEGORIES TAB (TAM ÖZELLİK) ──────────────────────────────────────────────
 function CategoriesTab() {
   const [cats, setCats] = useState([]);
   const [newName, setNewName] = useState('');
@@ -159,19 +161,15 @@ function CategoriesTab() {
   return (
     <View>
       <View style={styles.card}>
-        <TextInput style={styles.input} placeholder="Yeni Kategori" value={newName} onChangeText={setNewName} placeholderTextColor={C.txtDim} />
-        <TouchableOpacity style={styles.primaryBtn} onPress={async () => {
-          if(!newName.trim()) return;
-          try { await createCategory({name: newName.trim(), order: cats.length+1}); setNewName(''); load(); } catch(e) { Alert.alert("Hata", "Eklenemedi"); }
-        }}><Text style={styles.primaryBtnTxt}>Ekle</Text></TouchableOpacity>
+        <TextInput style={styles.input} placeholder="Kategori Adı" value={newName} onChangeText={setNewName} placeholderTextColor={C.txtDim} />
+        <TouchableOpacity style={styles.primaryBtn} onPress={async () => { if(!newName.trim()) return; try { await createCategory({name: newName.trim(), order: cats.length+1}); setNewName(''); load(); } catch(e) { Alert.alert("Hata", "Eklenemedi"); } }}><Text style={styles.primaryBtnTxt}>Ekle</Text></TouchableOpacity>
       </View>
       {cats.map(c => (
         <View key={c.id} style={styles.itemCard}>
           <Text style={[styles.productName, {flex: 1}]}>{c.name}</Text>
           <TouchableOpacity onPress={() => {
             Alert.alert('Sil', 'Kategoriyi sil?', [
-              {text: 'Vazgeç'},
-              {text: 'Sil', onPress: async () => { try { await deleteCategory(c.id); load(); } catch(e) { Alert.alert("Hata", "Silinemedi"); } }}
+              {text: 'Vazgeç'}, {text: 'Sil', onPress: async () => { try { await deleteCategory(c.id); load(); } catch(e) { Alert.alert("Hata", "Silinemedi"); } }}
             ]);
           }}><Text style={{fontSize: 18}}>🗑️</Text></TouchableOpacity>
         </View>
@@ -180,7 +178,7 @@ function CategoriesTab() {
   );
 }
 
-// ── RAPORLAR (Tüm Masa Detayları 11-14 + PDF Linkleri) ─────────────────────────
+// ── REPORTS (MASA 11, 12, 13, 14 VE PDF LİNKLERİ EKSİKSİZ) ─────────────────────
 function DailyTab() {
   const [dateStr, setDateStr] = useState(todayStr());
   const [report, setReport] = useState(null);
@@ -195,7 +193,7 @@ function DailyTab() {
       </View>
       {loading ? <Loader /> : report && (
         <View>
-          <TouchableOpacity style={styles.pdfBtn} onPress={() => Linking.openURL(`${BASE_URL}reports/daily-pdf/?date=${dateStr}`)}><Text style={styles.pdfBtnTxt}>📄 GÜNLÜK PDF</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.pdfBtn} onPress={() => Linking.openURL(`${BASE_URL}reports/daily-pdf/?date=${dateStr}`)}><Text style={styles.pdfBtnTxt}>📄 PDF İNDİR</Text></TouchableOpacity>
           <ReportCards report={report} />
         </View>
       )}
@@ -213,13 +211,13 @@ function MonthlyTab() {
   return (
     <View>
       <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
-        <TextInput style={[styles.input, { flex: 1 }]} value={year} onChangeText={setYear} keyboardType="numeric" />
-        <TextInput style={[styles.input, { flex: 0.5 }]} value={month} onChangeText={setMonth} keyboardType="numeric" />
+        <TextInput style={[styles.input, { flex: 1 }]} value={year} onChangeText={setYear} />
+        <TextInput style={[styles.input, { flex: 0.5 }]} value={month} onChangeText={setMonth} />
         <TouchableOpacity style={styles.primaryBtn} onPress={fetch}><Text style={styles.primaryBtnTxt}>GETİR</Text></TouchableOpacity>
       </View>
       {loading ? <Loader /> : report && (
         <View>
-          <TouchableOpacity style={styles.pdfBtn} onPress={() => Linking.openURL(`${BASE_URL}reports/monthly-pdf/?year=${year}&month=${month}`)}><Text style={styles.pdfBtnTxt}>📄 AYLIK PDF</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.pdfBtn} onPress={() => Linking.openURL(`${BASE_URL}reports/monthly-pdf/?year=${year}&month=${month}`)}><Text style={styles.pdfBtnTxt}>📄 PDF İNDİR</Text></TouchableOpacity>
           <ReportCards report={report} />
         </View>
       )}
@@ -255,16 +253,25 @@ function StatCard({ label, value, highlight }) {
 
 function Loader() { return <ActivityIndicator color={C.amber} style={{ marginTop: 20 }} size="large" />; }
 
+// ── STYLE (KESİN VE SIKI DÜZEN) ────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bgDark },
-  tabBarWrapper: { backgroundColor: C.bgMid, borderBottomWidth: 1, borderColor: C.border, zIndex: 10 },
+  tabBarWrapper: { backgroundColor: C.bgMid, borderBottomWidth: 1, borderColor: C.border, zIndex: 100 },
   tabBar: { maxHeight: 45 },
   tabBarContent: { paddingHorizontal: 10, paddingVertical: 5, gap: 5 },
   tab: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: R.full, backgroundColor: C.bgLight },
   tabActive: { backgroundColor: C.amber },
   tabTxt: { fontSize: 11, fontWeight: '700', color: C.txtSecond },
   tabTxtActive: { color: C.bgDark },
-  mainScrollContent: { padding: 10, paddingBottom: 40, maxWidth: Platform.OS === 'web' ? 650 : '100%', alignSelf: 'center', width: '100%' },
+  
+  mainScrollContent: { 
+    padding: 10, 
+    paddingBottom: 40, 
+    maxWidth: Platform.OS === 'web' ? 650 : '100%', 
+    alignSelf: 'center', 
+    width: '100%' 
+  },
+
   card: { backgroundColor: C.bgMid, borderRadius: R.md, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: C.border },
   formTitle: { color: C.amber, fontWeight: '900', marginBottom: 6, fontSize: 13 },
   label: { color: C.txtSecond, fontSize: 10, marginBottom: 4, fontWeight: '700' },
@@ -276,8 +283,8 @@ const styles = StyleSheet.create({
   primaryBtn: { backgroundColor: C.amber, borderRadius: R.sm, padding: 10, alignItems: 'center' },
   primaryBtnTxt: { color: C.bgDark, fontWeight: '800', fontSize: 12 },
   itemCard: { backgroundColor: C.bgMid, borderRadius: R.sm, padding: 8, marginBottom: 6, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: C.border },
-  productName: { color: C.txtPrimary, fontWeight: '700', fontSize: 13 },
-  priceAmt: { color: C.amber, fontWeight: '800', fontSize: 13 },
+  productName: { color: C.txtPrimary, fontWeight: '700', fontSize: 12 },
+  priceAmt: { color: C.amber, fontWeight: '800', fontSize: 12 },
   statCard: { backgroundColor: C.bgMid, borderRadius: R.md, padding: 10, marginBottom: 6, borderWidth: 1, borderColor: C.border },
   statCardHighlight: { backgroundColor: C.amber },
   statLabel: { fontSize: 10, fontWeight: '700', color: C.txtSecond },
@@ -286,6 +293,6 @@ const styles = StyleSheet.create({
   pdfBtnTxt: { color: '#fff', fontWeight: '800', fontSize: 11 },
   paymentSection: { flexDirection: 'row', gap: 6, marginBottom: 10 },
   payBox: { flex: 1, padding: 8, borderRadius: R.sm, borderWidth: 2, alignItems: 'center', backgroundColor: C.bgMid },
-  payLabel: { fontSize: 10, fontWeight: '800' },
+  payLabel: { fontSize: 9, fontWeight: '800' },
   payVal: { fontSize: 14, fontWeight: '900' }
 });
