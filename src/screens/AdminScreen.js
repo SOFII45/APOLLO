@@ -8,7 +8,7 @@ import {
   getProducts, getCategories, createProduct, updateProduct, deleteProduct,
   createCategory, deleteCategory, getDailyReport, getMonthlyReport, extractError,
 } from '../services/api';
-import { C, F, R, S } from '../constants/theme'; // S (Shadow/Card) eklendi
+import { C, F, R, S } from '../constants/theme';
 
 const TABS = [
   { key: 'products',   label: '🥐 Ürünler' },
@@ -24,15 +24,9 @@ const BASE_URL = "https://apollo45.pythonanywhere.com/api/";
 export default function AdminScreen() {
   const [activeTab, setActiveTab] = useState('products');
 
-  // Web'de tüm sayfanın kaymasını sağlayan ana kapsayıcı stili
-  const webContainerStyle = Platform.OS === 'web' ? {
-    height: '100vh',
-    overflowY: 'auto',
-    backgroundColor: C.bgDark
-  } : { flex: 1 };
-
   return (
-    <View style={[styles.root, webContainerStyle]}>
+    // Web'de çift kaydırmayı engellemek için ana View'ı sabit tutuyoruz
+    <View style={styles.root}>
       <View style={styles.tabBarWrapper}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabBar} contentContainerStyle={styles.tabBarContent}>
           {TABS.map(t => (
@@ -43,12 +37,17 @@ export default function AdminScreen() {
         </ScrollView>
       </View>
       
-      <View style={styles.contentArea}>
+      {/* ScrollView artık tüm içeriği kaplıyor ve TEK bir kaydırma çubuğu üretiyor */}
+      <ScrollView 
+        style={styles.contentArea} 
+        contentContainerStyle={styles.tabContent}
+        showsVerticalScrollIndicator={true}
+      >
         {activeTab === 'products'   && <ProductsTab />}
         {activeTab === 'categories' && <CategoriesTab />}
         {activeTab === 'daily'      && <DailyTab />}
         {activeTab === 'monthly'    && <MonthlyTab />}
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -121,11 +120,11 @@ function ProductsTab() {
   if (loading) return <Loader />;
 
   return (
-    <ScrollView contentContainerStyle={styles.tabContent} keyboardShouldPersistTaps="handled">
+    <View style={styles.innerContent}>
       <View style={styles.card}>
         <Text style={styles.formTitle}>{editingId ? "🎁 Ürünü Düzenle" : "🆕 Yeni Ürün Ekle"}</Text>
         <TextInput style={styles.input} placeholder="Ürün Adı" value={newName} onChangeText={setNewName} placeholderTextColor={C.txtDim} />
-        <TextInput style={styles.input} placeholder="Fiyat (Örn: 120)" value={newPrice} onChangeText={setNewPrice} keyboardType="numeric" placeholderTextColor={C.txtDim} />
+        <TextInput style={styles.input} placeholder="Fiyat" value={newPrice} onChangeText={setNewPrice} keyboardType="numeric" placeholderTextColor={C.txtDim} />
 
         <Text style={styles.label}>Kategori Seç:</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 15}}>
@@ -149,21 +148,19 @@ function ProductsTab() {
         </View>
       </View>
 
-      <View style={styles.listWrapper}>
-        {products.map(p => (
-          <View key={p.id} style={styles.itemCard}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.productName}>{p.name}</Text>
-              <Text style={styles.priceAmt}>{fmt(p.price)}</Text>
-            </View>
-            <View style={{flexDirection: 'row', gap: 12}}>
-                <TouchableOpacity onPress={() => startEdit(p)}><Text style={{fontSize: 22}}>✏️</Text></TouchableOpacity>
-                <TouchableOpacity onPress={() => handleDelete(p.id)}><Text style={{fontSize: 22}}>🗑️</Text></TouchableOpacity>
-            </View>
+      {products.map(p => (
+        <View key={p.id} style={styles.itemCard}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.productName}>{p.name}</Text>
+            <Text style={styles.priceAmt}>{fmt(p.price)}</Text>
           </View>
-        ))}
-      </View>
-    </ScrollView>
+          <View style={{flexDirection: 'row', gap: 12}}>
+              <TouchableOpacity onPress={() => startEdit(p)}><Text style={{fontSize: 22}}>✏️</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => handleDelete(p.id)}><Text style={{fontSize: 22}}>🗑️</Text></TouchableOpacity>
+          </View>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -192,7 +189,7 @@ function CategoriesTab() {
     Alert.alert('Kategoriyi Sil', 'Bu kategoriyi tamamen silmek istiyor musun?', [
       { text: 'Vazgeç' },
       { text: 'SİL', style: 'destructive', onPress: async () => {
-        try { await deleteCategory(id); load(); } catch (e) { Alert.alert('Hata', "Silinemedi. Kategoriye bağlı ürünler olabilir."); }
+        try { await deleteCategory(id); load(); } catch (e) { Alert.alert('Hata', "Silinemedi."); }
       }}
     ]);
   };
@@ -200,24 +197,22 @@ function CategoriesTab() {
   if (loading) return <Loader />;
 
   return (
-    <ScrollView contentContainerStyle={styles.tabContent}>
+    <View style={styles.innerContent}>
       <View style={styles.card}>
         <TextInput style={styles.input} placeholder="Yeni Kategori Adı" value={newName} onChangeText={setNewName} placeholderTextColor={C.txtDim} />
         <TouchableOpacity style={styles.primaryBtn} onPress={handleAdd}><Text style={styles.primaryBtnTxt}>Kategori Ekle</Text></TouchableOpacity>
       </View>
-      <View style={styles.listWrapper}>
-        {cats.map(c => (
-          <View key={c.id} style={styles.itemCard}>
-            <Text style={[styles.productName, {flex: 1}]}>{c.name}</Text>
-            <TouchableOpacity onPress={() => handleDelete(c.id)}><Text style={{fontSize: 22}}>🗑️</Text></TouchableOpacity>
-          </View>
-        ))}
-      </View>
-    </ScrollView>
+      {cats.map(c => (
+        <View key={c.id} style={styles.itemCard}>
+          <Text style={[styles.productName, {flex: 1}]}>{c.name}</Text>
+          <TouchableOpacity onPress={() => handleDelete(c.id)}><Text style={{fontSize: 22}}>🗑️</Text></TouchableOpacity>
+        </View>
+      ))}
+    </View>
   );
 }
 
-// ── REPORTS TAB (Daily) ───────────────────────────────────────────────────────────────
+// ── DAILY / MONTHLY (Raporlar aynı yapı) ────────────────────────────────────────────────────────────
 function DailyTab() {
   const [dateStr, setDateStr] = useState(todayStr());
   const [report, setReport] = useState(null);
@@ -227,28 +222,18 @@ function DailyTab() {
     try { setReport(await getDailyReport(dateStr)); } catch (e) { Alert.alert('Hata', extractError(e)); }
     finally { setLoading(false); }
   };
-  const downloadPdf = () => {
-    const url = `${BASE_URL}reports/daily-pdf/?date=${dateStr}`;
-    Linking.openURL(url).catch(() => Alert.alert('Hata', 'PDF açılamadı.'));
-  };
   useEffect(() => { fetch(); }, []);
   return (
-    <ScrollView contentContainerStyle={styles.tabContent}>
-      <View style={styles.reportHeader}>
+    <View style={styles.innerContent}>
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 15 }}>
         <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} value={dateStr} onChangeText={setDateStr} />
-        <TouchableOpacity style={[styles.primaryBtn, {paddingVertical: 12}]} onPress={fetch}><Text style={styles.primaryBtnTxt}>Getir</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.primaryBtn} onPress={fetch}><Text style={styles.primaryBtnTxt}>Getir</Text></TouchableOpacity>
       </View>
-      {loading ? <Loader /> : report && (
-        <View>
-          <TouchableOpacity style={styles.pdfBtn} onPress={downloadPdf}><Text style={styles.pdfBtnTxt}>📄 Günlük PDF İndir</Text></TouchableOpacity>
-          <ReportCards report={report} />
-        </View>
-      )}
-    </ScrollView>
+      {loading ? <Loader /> : report && <ReportCards report={report} />}
+    </View>
   );
 }
 
-// ── REPORTS TAB (Monthly) ───────────────────────────────────────────────────────────────
 function MonthlyTab() {
   const now = new Date();
   const [year, setYear] = useState(String(now.getFullYear()));
@@ -260,32 +245,22 @@ function MonthlyTab() {
     try { setReport(await getMonthlyReport(year, month)); } catch (e) { Alert.alert('Hata', extractError(e)); }
     finally { setLoading(false); }
   };
-  const downloadPdf = () => {
-    const url = `${BASE_URL}reports/monthly-pdf/?year=${year}&month=${month}`;
-    Linking.openURL(url).catch(() => Alert.alert('Hata', 'PDF açılamadı.'));
-  };
   useEffect(() => { fetch(); }, []);
   return (
-    <ScrollView contentContainerStyle={styles.tabContent}>
-      <View style={styles.reportHeader}>
-        <TextInput style={[styles.input, { flex: 1 }]} value={year} onChangeText={setYear} keyboardType="numeric" />
-        <TextInput style={[styles.input, { flex: 0.5 }]} value={month} onChangeText={setMonth} keyboardType="numeric" />
-        <TouchableOpacity style={[styles.primaryBtn, {paddingVertical: 12}]} onPress={fetch}><Text style={styles.primaryBtnTxt}>Getir</Text></TouchableOpacity>
+    <View style={styles.innerContent}>
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 15 }}>
+        <TextInput style={[styles.input, { flex: 1 }]} value={year} onChangeText={setYear} />
+        <TextInput style={[styles.input, { flex: 0.5 }]} value={month} onChangeText={setMonth} />
+        <TouchableOpacity style={styles.primaryBtn} onPress={fetch}><Text style={styles.primaryBtnTxt}>Getir</Text></TouchableOpacity>
       </View>
-      {loading ? <Loader /> : report && (
-        <View>
-          <TouchableOpacity style={styles.pdfBtn} onPress={downloadPdf}><Text style={styles.pdfBtnTxt}>📄 Aylık PDF İndir</Text></TouchableOpacity>
-          <ReportCards report={report} />
-        </View>
-      )}
-    </ScrollView>
+      {loading ? <Loader /> : report && <ReportCards report={report} />}
+    </View>
   );
 }
 
-// ── REPORT CARDS ─────────────────────────────────────────────────────────────
 function ReportCards({ report }) {
   return (
-    <View style={styles.reportContainer}>
+    <View>
       <View style={styles.paymentSection}>
         <View style={[styles.payBox, {borderColor: '#4CAF50'}]}>
           <Text style={styles.payLabel}>💵 NAKİT</Text>
@@ -296,12 +271,8 @@ function ReportCards({ report }) {
           <Text style={[styles.payVal, {color: '#2196F3'}]}>{fmt(report.card_total)}</Text>
         </View>
       </View>
-      <StatCard label="🏠 Salon Satışı" value={fmt(report.salon)} />
-      <StatCard label="🎁 Misafir (Masa 11)" value={fmt(report.misafir)} />
-      <StatCard label="🧡 Trendyol (Masa 12)" value={fmt(report.trendyol)} />
-      <StatCard label="💜 Getir (Masa 13)" value={fmt(report.getir)} />
-      <StatCard label="🛵 Kurye (Masa 14)" value={fmt(report.kurye)} />
       <StatCard label="TOPLAM HASILAT" value={fmt(report.total_revenue)} highlight />
+      <StatCard label="🏠 Salon Satışı" value={fmt(report.salon)} />
     </View>
   );
 }
@@ -319,52 +290,41 @@ function Loader() { return <ActivityIndicator color={C.amber} style={{ marginTop
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bgDark },
-  tabBarWrapper: { 
-    zIndex: 10,
-    backgroundColor: C.bgMid,
-    borderBottomWidth: 1,
-    borderColor: C.border,
-  },
+  tabBarWrapper: { backgroundColor: C.bgMid, borderBottomWidth: 1, borderColor: C.border },
   tabBar: { maxHeight: 60 },
   tabBarContent: { paddingHorizontal: 10, paddingVertical: 10, gap: 8 },
   tab: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: R.full, backgroundColor: C.bgLight },
   tabActive: { backgroundColor: C.amber },
   tabTxt: { fontSize: F.sm, fontWeight: '700', color: C.txtSecond },
   tabTxtActive: { color: C.bgDark },
-  contentArea: { flex: 1 },
-  tabContent: { 
+  
+  // ÇİFT ÇUBUĞU ÖNLEYEN KRİTİK ALAN
+  contentArea: { flex: 1 }, 
+  tabContent: { paddingBottom: 100 }, // İçerideki ScrollView'ın sonuna boşluk ekler
+  innerContent: { 
     padding: 15, 
-    maxWidth: Platform.OS === 'web' ? 800 : '100%', // Web'de çok yayılmasın
-    alignSelf: 'center',
-    width: '100%',
-    paddingBottom: 50
+    width: '100%', 
+    maxWidth: Platform.OS === 'web' ? 800 : '100%', 
+    alignSelf: 'center' 
   },
+
   card: { backgroundColor: C.bgMid, borderRadius: R.lg, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: C.border },
   formTitle: { color: C.amber, fontWeight: '900', marginBottom: 12, fontSize: F.md },
   label: { color: C.txtSecond, fontSize: F.xs, marginBottom: 5, fontWeight: '700' },
-  input: { 
-    backgroundColor: C.bgLight, borderRadius: R.sm, padding: 12, color: C.txtPrimary, 
-    marginBottom: 10, borderWidth: 1, borderColor: C.border,
-    outlineStyle: 'none' // Web focus çizgisini kaldırır
-  },
+  input: { backgroundColor: C.bgLight, borderRadius: R.sm, padding: 12, color: C.txtPrimary, marginBottom: 10, borderWidth: 1, borderColor: C.border },
   catSelectBtn: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 8, backgroundColor: C.bgLight, marginRight: 8, borderWidth: 1, borderColor: C.border },
   catSelectBtnActive: { backgroundColor: C.amber, borderColor: C.amber },
   catSelectTxt: { color: C.txtPrimary, fontWeight: '600' },
   catSelectTxtActive: { color: C.bgDark, fontWeight: '800' },
   primaryBtn: { backgroundColor: C.amber, borderRadius: R.sm, padding: 14, alignItems: 'center' },
   primaryBtnTxt: { color: C.bgDark, fontWeight: '800' },
-  listWrapper: { width: '100%' },
   itemCard: { backgroundColor: C.bgMid, borderRadius: R.md, padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: C.border },
   productName: { color: C.txtPrimary, fontWeight: '700', fontSize: F.md },
   priceAmt: { color: C.amber, fontWeight: '800', fontSize: F.md },
-  reportHeader: { flexDirection: 'row', gap: 8, marginBottom: 15, alignItems: 'center' },
-  reportContainer: { width: '100%' },
   statCard: { backgroundColor: C.bgMid, borderRadius: R.lg, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: C.border },
   statCardHighlight: { backgroundColor: C.amber },
   statLabel: { fontSize: F.xs, fontWeight: '700', color: C.txtSecond },
   statValue: { fontSize: F.xl, fontWeight: '900', color: C.txtPrimary, marginTop: 4 },
-  pdfBtn: { backgroundColor: '#d32f2f', padding: 12, borderRadius: R.sm, marginBottom: 15, alignItems: 'center' },
-  pdfBtnTxt: { color: '#fff', fontWeight: '800' },
   paymentSection: { flexDirection: 'row', gap: 10, marginBottom: 15 },
   payBox: { flex: 1, padding: 12, borderRadius: R.md, borderWidth: 2, alignItems: 'center', backgroundColor: C.bgMid },
   payLabel: { fontSize: F.xs, fontWeight: '800', marginBottom: 4 },
