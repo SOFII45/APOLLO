@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, TouchableOpacity,
   StyleSheet, useWindowDimensions,
-  ActivityIndicator, StatusBar, ScrollView
+  ActivityIndicator, StatusBar, ScrollView, Platform
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -11,8 +11,7 @@ import { C, F, R, S } from '../constants/theme';
 import PinModal from '../components/PinModal';
 import usePolling from '../hooks/usePolling';
 
-// ── Table display helpers ─────────────────────────────────────────────────────
-
+// ── Yardımcı Fonksiyonlar ─────────────────────────────────────────────────────
 function getTableColor(t, hasItems) {
   if (t.table_type === 'guest')    return { bg: C.purple,  border: C.purpleDark };
   if (t.table_type === 'delivery') return { bg: C.blue,    border: C.blueDark };
@@ -26,22 +25,14 @@ function getTableLabel(t) {
   return `Masa\n${t.table_number}`;
 }
 
-function getTableStatus(t, hasItems) {
-  return (t.status === 'occupied' && hasItems) ? 'Dolu' : 'Boş';
-}
-
-// ── Component ─────────────────────────────────────────────────────────────────
-
 export default function TablesScreen({ navigation }) {
   const { width } = useWindowDimensions();
-  // Web'de daha stabil bir dizilim için dinamik kolon genişliği
   const columns = width < 480 ? 2 : width < 768 ? 3 : 4;
   const cardSize = (width - (columns + 1) * 20) / columns;
 
-  const [tables,   setTables]   = useState([]);
-  const [loading,  setLoading]  = useState(true);
+  const [tables, setTables] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [pinVisible, setPinVisible] = useState(false);
-
   const orderDetails = useRef({});
 
   const fetchData = useCallback(async () => {
@@ -49,210 +40,109 @@ export default function TablesScreen({ navigation }) {
       const [tbl, orders] = await Promise.all([getTables(), getOpenOrders()]);
       const map = {};
       orders.forEach(o => { 
-        if (!o.is_paid) {
-          map[o.table] = {
-            id: o.id,
-            hasItems: o.items && o.items.length > 0
-          };
-        } 
+        if (!o.is_paid) map[o.table] = { id: o.id, hasItems: o.items?.length > 0 };
       });
       orderDetails.current = map;
       setTables(tbl);
-    } catch {
-      // Polling hatalarını sessizce geç
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { console.error(e); } 
+    finally { setLoading(false); }
   }, []);
 
-  const [focused, setFocused] = useState(true);
-  useFocusEffect(
-    useCallback(() => {
-      setFocused(true);
-      fetchData();
-      return () => setFocused(false);
-    }, [fetchData])
-  );
-  usePolling(fetchData, 3000, focused);
+  useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
+  usePolling(fetchData, 3000, true);
 
   const handlePress = (table) => {
     const existingOrder = orderDetails.current[table.id];
     navigation.navigate('Order', {
-      orderId:   existingOrder ? existingOrder.id : null,
-      tableId:   table.id,
+      orderId: existingOrder ? existingOrder.id : null,
+      tableId: table.id,
       tableName: getTableLabel(table).replace('\n', ' '),
     });
   };
 
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={C.amber} />
-        <Text style={styles.loadTxt}>Masalar yükleniyor…</Text>
-      </View>
-    );
-  }
+  if (loading) return (
+    <View style={styles.center}><ActivityIndicator size="large" color={C.amber} /></View>
+  );
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={C.bgDark} />
+      <StatusBar barStyle="light-content" />
 
-      {/* ÜST BAR SABİT */}
+      {/* HEADER SABİT OLSUN DİYE SCROLLVIEW DIŞINDA TUTTUK */}
       <View style={styles.headerBar}>
         <View>
           <Text style={styles.headerTitle}>☕ Kafe POS</Text>
           <Text style={styles.headerSub}>{tables.length} masa</Text>
         </View>
         <View style={styles.legendRow}>
-          {[
-            { color: C.green,  label: 'Boş' },
-            { color: C.red,    label: 'Dolu' },
-            { color: C.purple, label: 'Misafir' },
-            { color: C.blue,   label: 'Teslimat' },
-          ].map(l => (
-            <View key={l.label} style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: l.color }]} />
-              <Text style={styles.legendTxt}>{l.label}</Text>
+          {[{ c: C.green, l: 'Boş' }, { c: C.red, l: 'Dolu' }].map(x => (
+            <View key={x.l} style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: x.c }]} />
+              <Text style={styles.legendTxt}>{x.l}</Text>
             </View>
           ))}
         </View>
       </View>
 
-      {/* ANA KAYDIRMA ALANI */}
+      {/* ANA KAYDIRICI: Web'de çift çubuğu önlemek için style ayarı yapıldı */}
       <ScrollView 
-        style={{ flex: 1 }}
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={true}
+        showsVerticalScrollIndicator={Platform.OS === 'web'}
       >
-        <View style={styles.gridWrapper}>
+        <View style={styles.grid}>
           {tables.map((item) => {
-            const tableInfo = orderDetails.current[item.id];
-            const hasItems = tableInfo?.hasItems;
+            const hasItems = orderDetails.current[item.id]?.hasItems;
             const { bg, border } = getTableColor(item, hasItems);
-
             return (
               <TouchableOpacity
                 key={item.id}
-                style={[
-                  styles.card,
-                  {
-                    backgroundColor: bg,
-                    borderColor: border,
-                    width: cardSize,
-                    height: cardSize * 0.85,
-                  },
-                  S.card,
-                ]}
+                style={[styles.card, { backgroundColor: bg, borderColor: border, width: cardSize, height: cardSize * 0.85 }]}
                 onPress={() => handlePress(item)}
-                activeOpacity={0.78}
               >
                 <Text style={styles.cardNum}>{getTableLabel(item)}</Text>
-                <View style={[styles.statusBadge, (item.status === 'occupied' && hasItems) && styles.statusBadgeOcc]}>
-                  <Text style={styles.statusTxt}>{getTableStatus(item, hasItems)}</Text>
-                </View>
                 {hasItems && <View style={styles.dotBadge} />}
               </TouchableOpacity>
             );
           })}
         </View>
 
-        {/* ADMIN BUTONU - Sayfanın en altında */}
-        <TouchableOpacity
-          style={styles.adminBtnWeb}
-          onPress={() => setPinVisible(true)}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.adminTxt}>⚙️  Admin Paneline Giriş Yap</Text>
+        {/* ADMIN BUTONU: Listenin en altında */}
+        <TouchableOpacity style={styles.adminBtn} onPress={() => setPinVisible(true)}>
+          <Text style={styles.adminTxt}>⚙️ Admin Paneline Giriş</Text>
         </TouchableOpacity>
       </ScrollView>
 
-      <PinModal
-        visible={pinVisible}
-        onClose={() => setPinVisible(false)}
-        onSuccess={() => { setPinVisible(false); navigation.navigate('Admin'); }}
-      />
+      <PinModal visible={pinVisible} onClose={() => setPinVisible(false)} 
+                onSuccess={() => { setPinVisible(false); navigation.navigate('Admin'); }} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bgDark },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bgDark },
-  loadTxt: { color: C.txtSecond, fontSize: F.md, marginTop: 12 },
-  headerBar: {
-    backgroundColor: C.bgMid,
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderColor: C.border,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    zIndex: 10,
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: C.bgDark },
+  headerBar: { 
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    padding: 16, backgroundColor: C.bgMid, borderBottomWidth: 1, borderColor: C.border 
   },
   headerTitle: { fontSize: F.xl, fontWeight: '800', color: C.txtPrimary },
   headerSub: { fontSize: F.sm, color: C.txtSecond },
-  legendRow: { flexDirection: 'row', gap: 10 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendDot:  { width: 10, height: 10, borderRadius: 5 },
-  legendTxt:  { fontSize: F.xs, color: C.txtSecond },
+  legendRow: { flexDirection: 'row', gap: 8 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendTxt: { fontSize: F.xs, color: C.txtSecond },
   
-  scrollContent: { 
-    paddingBottom: 40,
-    flexGrow: 1 
+  scrollView: { flex: 1 },
+  scrollContent: { paddingBottom: 60 }, // En altta boşluk bırakır
+  grid: { flexDirection: 'row', flexWrap: 'wrap', padding: 10, justifyContent: 'flex-start' },
+  card: { margin: 5, borderRadius: R.lg, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
+  cardNum: { color: C.white, fontSize: F.lg, fontWeight: '900', textAlign: 'center' },
+  dotBadge: { position: 'absolute', top: 8, right: 8, width: 10, height: 10, borderRadius: 5, backgroundColor: C.amber, borderWidth: 1.5, borderColor: C.white },
+  
+  adminBtn: { 
+    backgroundColor: C.bgMid, margin: 20, padding: 18, borderRadius: R.lg, 
+    alignItems: 'center', borderWidth: 1, borderColor: C.border 
   },
-  gridWrapper: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 10,
-    justifyContent: 'flex-start',
-  },
-  card: {
-    margin: 5,
-    borderRadius: R.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    padding: 10,
-  },
-  cardNum: {
-    color: C.white,
-    fontSize: F.lg,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  statusBadge: {
-    marginTop: 8,
-    backgroundColor: 'rgba(255,255,255,0.20)',
-    borderRadius: R.full,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  statusBadgeOcc: { backgroundColor: 'rgba(0,0,0,0.22)' },
-  statusTxt: { color: C.white, fontSize: F.xs, fontWeight: '700' },
-  dotBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: C.amber,
-    borderWidth: 1.5,
-    borderColor: C.white,
-  },
-  adminBtnWeb: {
-    backgroundColor: C.bgMid,
-    borderRadius: R.lg,
-    paddingVertical: 18,
-    marginHorizontal: 15,
-    marginTop: 20,
-    marginBottom: 40,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: C.border,
-    ...S.card,
-  },
-  adminTxt: { color: C.txtPrimary, fontWeight: '700', fontSize: F.md },
+  adminTxt: { color: C.txtPrimary, fontWeight: '700' }
 });
