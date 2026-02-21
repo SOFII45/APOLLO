@@ -112,7 +112,7 @@ export default function TablesScreen({ navigation }) {
 
       {/* HEADER */}
       <View style={styles.header}>
-        <Text style={styles.title}>☕ Kafe POS</Text>
+        <Text style={styles.title}>☕ APOLLO POS</Text>
         <Text style={styles.subtitle}>{tables.length} Masa</Text>
       </View>
 
