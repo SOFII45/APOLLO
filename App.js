@@ -64,7 +64,7 @@ function LoginScreen({ onLogin }) {
       <StatusBar style="light" />
       <View style={loginStyles.card}>
         <Text style={loginStyles.logo}>☕</Text>
-        <Text style={loginStyles.title}>Kafe POS</Text>
+        <Text style={loginStyles.title}>APOLLO POS</Text>
         <Text style={loginStyles.subtitle}>Giriş Yapın</Text>
 
         <TextInput
