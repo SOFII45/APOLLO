@@ -2,7 +2,8 @@ import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, TouchableOpacity,
   StyleSheet, useWindowDimensions,
-  ActivityIndicator, StatusBar, ScrollView, Platform
+  ActivityIndicator, StatusBar,
+  ScrollView, Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -11,138 +12,264 @@ import { C, F, R, S } from '../constants/theme';
 import PinModal from '../components/PinModal';
 import usePolling from '../hooks/usePolling';
 
-// ── Yardımcı Fonksiyonlar ─────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────
+
 function getTableColor(t, hasItems) {
-  if (t.table_type === 'guest')    return { bg: C.purple,  border: C.purpleDark };
-  if (t.table_type === 'delivery') return { bg: C.blue,    border: C.blueDark };
-  if (t.status === 'occupied' && hasItems) return { bg: C.red, border: C.redDark };
-  return { bg: C.green, border: C.greenDark };
+  if (t.table_type === 'guest')    return { bg: '#6C5CE7', border: '#4B3FBF' };
+  if (t.table_type === 'delivery') return { bg: '#0984E3', border: '#0652A3' };
+  if (t.status === 'occupied' && hasItems) return { bg: '#D63031', border: '#9B1C1C' };
+  return { bg: '#00B894', border: '#008E6B' };
 }
 
 function getTableLabel(t) {
   if (t.table_type === 'guest')    return 'Misafir';
-  if (t.table_type === 'delivery') return `Kurye\n${t.table_number}`;
-  return `Masa\n${t.table_number}`;
+  if (t.table_type === 'delivery') return `Kurye ${t.table_number}`;
+  return `Masa ${t.table_number}`;
 }
+
+function getTableStatus(t, hasItems) {
+  return (t.status === 'occupied' && hasItems) ? 'Dolu' : 'Boş';
+}
+
+// ─────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────
 
 export default function TablesScreen({ navigation }) {
   const { width } = useWindowDimensions();
-  const columns = width < 480 ? 2 : width < 768 ? 3 : 4;
-  const cardSize = (width - (columns + 1) * 20) / columns;
+
+  // Responsive kolon sayısı (WEB için optimize)
+  let columns = 2;
+  if (width > 1600) columns = 6;
+  else if (width > 1200) columns = 5;
+  else if (width > 900) columns = 4;
+  else if (width > 600) columns = 3;
 
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pinVisible, setPinVisible] = useState(false);
+
   const orderDetails = useRef({});
 
   const fetchData = useCallback(async () => {
     try {
-      const [tbl, orders] = await Promise.all([getTables(), getOpenOrders()]);
+      const [tbl, orders] = await Promise.all([
+        getTables(),
+        getOpenOrders()
+      ]);
+
       const map = {};
-      orders.forEach(o => { 
-        if (!o.is_paid) map[o.table] = { id: o.id, hasItems: o.items?.length > 0 };
+      orders.forEach(o => {
+        if (!o.is_paid) {
+          map[o.table] = {
+            id: o.id,
+            hasItems: o.items && o.items.length > 0
+          };
+        }
       });
+
       orderDetails.current = map;
       setTables(tbl);
-    } catch (e) { console.error(e); } 
+    } catch {}
     finally { setLoading(false); }
   }, []);
 
-  useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
-  usePolling(fetchData, 3000, true);
+  const [focused, setFocused] = useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      setFocused(true);
+      fetchData();
+      return () => setFocused(false);
+    }, [fetchData])
+  );
+
+  usePolling(fetchData, 3000, focused);
 
   const handlePress = (table) => {
     const existingOrder = orderDetails.current[table.id];
+
     navigation.navigate('Order', {
       orderId: existingOrder ? existingOrder.id : null,
       tableId: table.id,
-      tableName: getTableLabel(table).replace('\n', ' '),
+      tableName: getTableLabel(table),
     });
   };
 
-  if (loading) return (
-    <View style={styles.center}><ActivityIndicator size="large" color={C.amber} /></View>
-  );
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={C.amber} />
+        <Text style={styles.loadTxt}>Masalar yükleniyor…</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="light-content" backgroundColor={C.bgDark} />
 
-      {/* HEADER SABİT OLSUN DİYE SCROLLVIEW DIŞINDA TUTTUK */}
-      <View style={styles.headerBar}>
-        <View>
-          <Text style={styles.headerTitle}>☕ Kafe POS</Text>
-          <Text style={styles.headerSub}>{tables.length} masa</Text>
-        </View>
-        <View style={styles.legendRow}>
-          {[{ c: C.green, l: 'Boş' }, { c: C.red, l: 'Dolu' }].map(x => (
-            <View key={x.l} style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: x.c }]} />
-              <Text style={styles.legendTxt}>{x.l}</Text>
-            </View>
-          ))}
-        </View>
+      {/* HEADER */}
+      <View style={styles.header}>
+        <Text style={styles.title}>☕ Kafe POS</Text>
+        <Text style={styles.subtitle}>{tables.length} Masa</Text>
       </View>
 
-      {/* ANA KAYDIRICI: Web'de çift çubuğu önlemek için style ayarı yapıldı */}
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={Platform.OS === 'web'}
+      {/* SCROLLABLE GRID */}
+      <ScrollView
+        contentContainerStyle={[
+          styles.grid,
+          { gridTemplateColumns: `repeat(${columns}, 1fr)` }
+        ]}
+        style={{ flex: 1 }}
       >
-        <View style={styles.grid}>
-          {tables.map((item) => {
-            const hasItems = orderDetails.current[item.id]?.hasItems;
-            const { bg, border } = getTableColor(item, hasItems);
-            return (
-              <TouchableOpacity
-                key={item.id}
-                style={[styles.card, { backgroundColor: bg, borderColor: border, width: cardSize, height: cardSize * 0.85 }]}
-                onPress={() => handlePress(item)}
-              >
-                <Text style={styles.cardNum}>{getTableLabel(item)}</Text>
-                {hasItems && <View style={styles.dotBadge} />}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        {tables.map((item) => {
+          const tableInfo = orderDetails.current[item.id];
+          const hasItems = tableInfo?.hasItems;
+          const { bg, border } = getTableColor(item, hasItems);
 
-        {/* ADMIN BUTONU: Listenin en altında */}
-        <TouchableOpacity style={styles.adminBtn} onPress={() => setPinVisible(true)}>
-          <Text style={styles.adminTxt}>⚙️ Admin Paneline Giriş</Text>
-        </TouchableOpacity>
+          return (
+            <TouchableOpacity
+              key={item.id}
+              onPress={() => handlePress(item)}
+              activeOpacity={0.85}
+              style={[
+                styles.card,
+                {
+                  backgroundColor: bg,
+                  borderColor: border,
+                }
+              ]}
+            >
+              <Text style={styles.cardTitle}>
+                {getTableLabel(item)}
+              </Text>
+
+              <Text style={styles.cardStatus}>
+                {getTableStatus(item, hasItems)}
+              </Text>
+
+              {hasItems && <View style={styles.dot} />}
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
-      <PinModal visible={pinVisible} onClose={() => setPinVisible(false)} 
-                onSuccess={() => { setPinVisible(false); navigation.navigate('Admin'); }} />
+      {/* ADMIN BUTTON */}
+      <TouchableOpacity
+        style={styles.adminBtn}
+        onPress={() => setPinVisible(true)}
+      >
+        <Text style={styles.adminTxt}>⚙ Admin</Text>
+      </TouchableOpacity>
+
+      <PinModal
+        visible={pinVisible}
+        onClose={() => setPinVisible(false)}
+        onSuccess={() => {
+          setPinVisible(false);
+          navigation.navigate('Admin');
+        }}
+      />
     </View>
   );
 }
 
+// ─────────────────────────────────────────────
+// Styles
+// ─────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bgDark },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: C.bgDark },
-  headerBar: { 
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    padding: 16, backgroundColor: C.bgMid, borderBottomWidth: 1, borderColor: C.border 
+  container: {
+    flex: 1,
+    backgroundColor: '#1E1E2E',
   },
-  headerTitle: { fontSize: F.xl, fontWeight: '800', color: C.txtPrimary },
-  headerSub: { fontSize: F.sm, color: C.txtSecond },
-  legendRow: { flexDirection: 'row', gap: 8 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendTxt: { fontSize: F.xs, color: C.txtSecond },
-  
-  scrollView: { flex: 1 },
-  scrollContent: { paddingBottom: 60 }, // En altta boşluk bırakır
-  grid: { flexDirection: 'row', flexWrap: 'wrap', padding: 10, justifyContent: 'flex-start' },
-  card: { margin: 5, borderRadius: R.lg, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
-  cardNum: { color: C.white, fontSize: F.lg, fontWeight: '900', textAlign: 'center' },
-  dotBadge: { position: 'absolute', top: 8, right: 8, width: 10, height: 10, borderRadius: 5, backgroundColor: C.amber, borderWidth: 1.5, borderColor: C.white },
-  
-  adminBtn: { 
-    backgroundColor: C.bgMid, margin: 20, padding: 18, borderRadius: R.lg, 
-    alignItems: 'center', borderWidth: 1, borderColor: C.border 
+
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  adminTxt: { color: C.txtPrimary, fontWeight: '700' }
+
+  loadTxt: {
+    marginTop: 12,
+    color: '#AAA',
+  },
+
+  header: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderColor: '#2C2C3E',
+  },
+
+  title: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#FFF',
+  },
+
+  subtitle: {
+    fontSize: 14,
+    color: '#AAA',
+    marginTop: 4,
+  },
+
+  grid: {
+    padding: 24,
+    gap: 20,
+    display: Platform.OS === 'web' ? 'grid' : 'flex',
+  },
+
+  card: {
+    borderRadius: 18,
+    padding: 28,
+    minHeight: 150,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    transitionDuration: '200ms', // web hover smooth
+  },
+
+  cardTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFF',
+    textAlign: 'center',
+  },
+
+  cardStatus: {
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFF',
+    opacity: 0.9,
+  },
+
+  dot: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#FFD166',
+  },
+
+  adminBtn: {
+    position: 'fixed',
+    bottom: 30,
+    right: 30,
+    backgroundColor: '#2C2C3E',
+    paddingHorizontal: 22,
+    paddingVertical: 14,
+    borderRadius: 40,
+    borderWidth: 1,
+    borderColor: '#3A3A55',
+  },
+
+  adminTxt: {
+    color: '#FFF',
+    fontWeight: '700',
+  },
 });
