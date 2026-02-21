@@ -8,7 +8,7 @@ import {
   getProducts, getCategories, createProduct, updateProduct, deleteProduct,
   createCategory, deleteCategory, getDailyReport, getMonthlyReport, extractError,
 } from '../services/api';
-import { C, F, R, S } from '../constants/theme';
+import { C, F, R } from '../constants/theme';
 
 const TABS = [
   { key: 'products',   label: '🥐 Ürünler' },
@@ -25,8 +25,8 @@ export default function AdminScreen() {
   const [activeTab, setActiveTab] = useState('products');
 
   return (
-    // Web'de çift kaydırmayı engellemek için ana View'ı sabit tutuyoruz
     <View style={styles.root}>
+      {/* ÜST TAB BAR - SABİT */}
       <View style={styles.tabBarWrapper}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabBar} contentContainerStyle={styles.tabBarContent}>
           {TABS.map(t => (
@@ -36,12 +36,12 @@ export default function AdminScreen() {
           ))}
         </ScrollView>
       </View>
-      
-      {/* ScrollView artık tüm içeriği kaplıyor ve TEK bir kaydırma çubuğu üretiyor */}
+
+      {/* ANA KAYDIRMA ALANI - Çift çubuğu önlemek için TEK bir ScrollView */}
       <ScrollView 
-        style={styles.contentArea} 
-        contentContainerStyle={styles.tabContent}
-        showsVerticalScrollIndicator={true}
+        style={{ flex: 1 }} 
+        contentContainerStyle={styles.mainScrollContent}
+        keyboardShouldPersistTaps="handled"
       >
         {activeTab === 'products'   && <ProductsTab />}
         {activeTab === 'categories' && <CategoriesTab />}
@@ -52,13 +52,12 @@ export default function AdminScreen() {
   );
 }
 
-// ── PRODUCTS TAB ───────────────────────────────────────────────────────────────
+// ── PRODUCTS TAB (Orijinal Özellikler) ─────────────────────────────────────────
 function ProductsTab() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
   const [newName, setNewName] = useState('');
   const [newPrice, setNewPrice] = useState('');
   const [newCatId, setNewCatId] = useState(null);
@@ -106,13 +105,10 @@ function ProductsTab() {
   };
 
   const handleDelete = (id) => {
-    Alert.alert('Ürünü Sil', 'Bu ürünü tamamen silmek istediğine emin misin?', [
+    Alert.alert('Ürünü Sil', 'Silsin mi?', [
       { text: 'Vazgeç' },
       { text: 'SİL', style: 'destructive', onPress: async () => {
-          try {
-            await deleteProduct(id);
-            setProducts(prev => prev.filter(p => p.id !== id));
-          } catch (e) { Alert.alert('Hata', "Silinemedi."); }
+          try { await deleteProduct(id); setProducts(prev => prev.filter(p => p.id !== id)); } catch (e) { Alert.alert('Hata', "Silinemedi."); }
       }}
     ]);
   };
@@ -120,26 +116,21 @@ function ProductsTab() {
   if (loading) return <Loader />;
 
   return (
-    <View style={styles.innerContent}>
+    <View>
       <View style={styles.card}>
         <Text style={styles.formTitle}>{editingId ? "🎁 Ürünü Düzenle" : "🆕 Yeni Ürün Ekle"}</Text>
         <TextInput style={styles.input} placeholder="Ürün Adı" value={newName} onChangeText={setNewName} placeholderTextColor={C.txtDim} />
-        <TextInput style={styles.input} placeholder="Fiyat" value={newPrice} onChangeText={setNewPrice} keyboardType="numeric" placeholderTextColor={C.txtDim} />
-
+        <TextInput style={styles.input} placeholder="Fiyat (Örn: 120)" value={newPrice} onChangeText={setNewPrice} keyboardType="numeric" placeholderTextColor={C.txtDim} />
         <Text style={styles.label}>Kategori Seç:</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 15}}>
           {categories.map(c => (
-            <TouchableOpacity key={c.id} onPress={() => setNewCatId(c.id)}
-              style={[styles.catSelectBtn, newCatId === c.id && styles.catSelectBtnActive]}>
+            <TouchableOpacity key={c.id} onPress={() => setNewCatId(c.id)} style={[styles.catSelectBtn, newCatId === c.id && styles.catSelectBtnActive]}>
               <Text style={[styles.catSelectTxt, newCatId === c.id && styles.catSelectTxtActive]}>{c.name}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
-
         <View style={{flexDirection: 'row', gap: 10}}>
-            <TouchableOpacity style={[styles.primaryBtn, {flex: 2}]} onPress={handleSave} disabled={saving}>
-                <Text style={styles.primaryBtnTxt}>{editingId ? "GÜNCELLE" : "KAYDET"}</Text>
-            </TouchableOpacity>
+            <TouchableOpacity style={[styles.primaryBtn, {flex: 2}]} onPress={handleSave} disabled={saving}><Text style={styles.primaryBtnTxt}>{editingId ? "GÜNCELLE" : "KAYDET"}</Text></TouchableOpacity>
             {editingId && (
                 <TouchableOpacity style={[styles.primaryBtn, {flex: 1, backgroundColor: C.bgLight}]} onPress={() => {setEditingId(null); setNewName(''); setNewPrice('');}}>
                     <Text style={[styles.primaryBtnTxt, {color: C.txtPrimary}]}>İPTAL</Text>
@@ -147,13 +138,9 @@ function ProductsTab() {
             )}
         </View>
       </View>
-
       {products.map(p => (
         <View key={p.id} style={styles.itemCard}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.productName}>{p.name}</Text>
-            <Text style={styles.priceAmt}>{fmt(p.price)}</Text>
-          </View>
+          <View style={{ flex: 1 }}><Text style={styles.productName}>{p.name}</Text><Text style={styles.priceAmt}>{fmt(p.price)}</Text></View>
           <View style={{flexDirection: 'row', gap: 12}}>
               <TouchableOpacity onPress={() => startEdit(p)}><Text style={{fontSize: 22}}>✏️</Text></TouchableOpacity>
               <TouchableOpacity onPress={() => handleDelete(p.id)}><Text style={{fontSize: 22}}>🗑️</Text></TouchableOpacity>
@@ -164,40 +151,26 @@ function ProductsTab() {
   );
 }
 
-// ── CATEGORIES TAB ────────────────────────────────────────────────────────────
+// ── CATEGORIES TAB (Orijinal Özellikler) ─────────────────────────────────────────
 function CategoriesTab() {
   const [cats, setCats] = useState([]);
   const [newName, setNewName] = useState('');
   const [loading, setLoading] = useState(true);
-
-  const load = async () => {
-    try { const data = await getCategories(); setCats(data); } 
-    catch (e) { Alert.alert('Hata', extractError(e)); }
-    finally { setLoading(false); }
-  };
+  const load = async () => { try { const data = await getCategories(); setCats(data); } catch (e) { Alert.alert('Hata', extractError(e)); } finally { setLoading(false); } };
   useEffect(() => { load(); }, []);
-
   const handleAdd = async () => {
     if (!newName.trim()) return;
-    try {
-      await createCategory({ name: newName.trim(), order: cats.length + 1 });
-      setNewName(''); load(); 
-    } catch (e) { Alert.alert('Hata', extractError(e)); }
+    try { await createCategory({ name: newName.trim(), order: cats.length + 1 }); setNewName(''); load(); } catch (e) { Alert.alert('Hata', extractError(e)); }
   };
-
   const handleDelete = (id) => {
-    Alert.alert('Kategoriyi Sil', 'Bu kategoriyi tamamen silmek istiyor musun?', [
+    Alert.alert('Kategoriyi Sil', 'Silsin mi?', [
       { text: 'Vazgeç' },
-      { text: 'SİL', style: 'destructive', onPress: async () => {
-        try { await deleteCategory(id); load(); } catch (e) { Alert.alert('Hata', "Silinemedi."); }
-      }}
+      { text: 'SİL', style: 'destructive', onPress: async () => { try { await deleteCategory(id); load(); } catch (e) { Alert.alert('Hata', "Silinemedi."); } }}
     ]);
   };
-
   if (loading) return <Loader />;
-
   return (
-    <View style={styles.innerContent}>
+    <View>
       <View style={styles.card}>
         <TextInput style={styles.input} placeholder="Yeni Kategori Adı" value={newName} onChangeText={setNewName} placeholderTextColor={C.txtDim} />
         <TouchableOpacity style={styles.primaryBtn} onPress={handleAdd}><Text style={styles.primaryBtnTxt}>Kategori Ekle</Text></TouchableOpacity>
@@ -212,24 +185,26 @@ function CategoriesTab() {
   );
 }
 
-// ── DAILY / MONTHLY (Raporlar aynı yapı) ────────────────────────────────────────────────────────────
+// ── DAILY / MONTHLY (PDF ve Tüm Masalar Korundu) ──────────────────────────────────
 function DailyTab() {
   const [dateStr, setDateStr] = useState(todayStr());
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
-  const fetch = async () => {
-    setLoading(true);
-    try { setReport(await getDailyReport(dateStr)); } catch (e) { Alert.alert('Hata', extractError(e)); }
-    finally { setLoading(false); }
-  };
+  const fetch = async () => { setLoading(true); try { setReport(await getDailyReport(dateStr)); } catch (e) { Alert.alert('Hata', extractError(e)); } finally { setLoading(false); } };
+  const downloadPdf = () => { Linking.openURL(`${BASE_URL}reports/daily-pdf/?date=${dateStr}`); };
   useEffect(() => { fetch(); }, []);
   return (
-    <View style={styles.innerContent}>
+    <View>
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 15 }}>
         <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} value={dateStr} onChangeText={setDateStr} />
         <TouchableOpacity style={styles.primaryBtn} onPress={fetch}><Text style={styles.primaryBtnTxt}>Getir</Text></TouchableOpacity>
       </View>
-      {loading ? <Loader /> : report && <ReportCards report={report} />}
+      {loading ? <Loader /> : report && (
+        <View>
+          <TouchableOpacity style={styles.pdfBtn} onPress={downloadPdf}><Text style={styles.pdfBtnTxt}>📄 Günlük PDF İndir</Text></TouchableOpacity>
+          <ReportCards report={report} />
+        </View>
+      )}
     </View>
   );
 }
@@ -240,20 +215,22 @@ function MonthlyTab() {
   const [month, setMonth] = useState(String(now.getMonth() + 1));
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
-  const fetch = async () => {
-    setLoading(true);
-    try { setReport(await getMonthlyReport(year, month)); } catch (e) { Alert.alert('Hata', extractError(e)); }
-    finally { setLoading(false); }
-  };
+  const fetch = async () => { setLoading(true); try { setReport(await getMonthlyReport(year, month)); } catch (e) { Alert.alert('Hata', extractError(e)); } finally { setLoading(false); } };
+  const downloadPdf = () => { Linking.openURL(`${BASE_URL}reports/monthly-pdf/?year=${year}&month=${month}`); };
   useEffect(() => { fetch(); }, []);
   return (
-    <View style={styles.innerContent}>
+    <View>
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 15 }}>
-        <TextInput style={[styles.input, { flex: 1 }]} value={year} onChangeText={setYear} />
-        <TextInput style={[styles.input, { flex: 0.5 }]} value={month} onChangeText={setMonth} />
+        <TextInput style={[styles.input, { flex: 1 }]} value={year} onChangeText={setYear} keyboardType="numeric" />
+        <TextInput style={[styles.input, { flex: 0.5 }]} value={month} onChangeText={setMonth} keyboardType="numeric" />
         <TouchableOpacity style={styles.primaryBtn} onPress={fetch}><Text style={styles.primaryBtnTxt}>Getir</Text></TouchableOpacity>
       </View>
-      {loading ? <Loader /> : report && <ReportCards report={report} />}
+      {loading ? <Loader /> : report && (
+        <View>
+          <TouchableOpacity style={styles.pdfBtn} onPress={downloadPdf}><Text style={styles.pdfBtnTxt}>📄 Aylık PDF İndir</Text></TouchableOpacity>
+          <ReportCards report={report} />
+        </View>
+      )}
     </View>
   );
 }
@@ -262,17 +239,15 @@ function ReportCards({ report }) {
   return (
     <View>
       <View style={styles.paymentSection}>
-        <View style={[styles.payBox, {borderColor: '#4CAF50'}]}>
-          <Text style={styles.payLabel}>💵 NAKİT</Text>
-          <Text style={[styles.payVal, {color: '#4CAF50'}]}>{fmt(report.cash_total)}</Text>
-        </View>
-        <View style={[styles.payBox, {borderColor: '#2196F3'}]}>
-          <Text style={styles.payLabel}>💳 KART</Text>
-          <Text style={[styles.payVal, {color: '#2196F3'}]}>{fmt(report.card_total)}</Text>
-        </View>
+        <View style={[styles.payBox, {borderColor: '#4CAF50'}]}><Text style={styles.payLabel}>💵 NAKİT</Text><Text style={[styles.payVal, {color: '#4CAF50'}]}>{fmt(report.cash_total)}</Text></View>
+        <View style={[styles.payBox, {borderColor: '#2196F3'}]}><Text style={styles.payLabel}>💳 KART</Text><Text style={[styles.payVal, {color: '#2196F3'}]}>{fmt(report.card_total)}</Text></View>
       </View>
-      <StatCard label="TOPLAM HASILAT" value={fmt(report.total_revenue)} highlight />
       <StatCard label="🏠 Salon Satışı" value={fmt(report.salon)} />
+      <StatCard label="🎁 Misafir (Masa 11)" value={fmt(report.misafir)} />
+      <StatCard label="🧡 Trendyol (Masa 12)" value={fmt(report.trendyol)} />
+      <StatCard label="💜 Getir (Masa 13)" value={fmt(report.getir)} />
+      <StatCard label="🛵 Kurye (Masa 14)" value={fmt(report.kurye)} />
+      <StatCard label="TOPLAM HASILAT" value={fmt(report.total_revenue)} highlight />
     </View>
   );
 }
@@ -290,24 +265,20 @@ function Loader() { return <ActivityIndicator color={C.amber} style={{ marginTop
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bgDark },
-  tabBarWrapper: { backgroundColor: C.bgMid, borderBottomWidth: 1, borderColor: C.border },
+  tabBarWrapper: { backgroundColor: C.bgMid, borderBottomWidth: 1, borderColor: C.border, zIndex: 10 },
   tabBar: { maxHeight: 60 },
   tabBarContent: { paddingHorizontal: 10, paddingVertical: 10, gap: 8 },
   tab: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: R.full, backgroundColor: C.bgLight },
   tabActive: { backgroundColor: C.amber },
   tabTxt: { fontSize: F.sm, fontWeight: '700', color: C.txtSecond },
   tabTxtActive: { color: C.bgDark },
-  
-  // ÇİFT ÇUBUĞU ÖNLEYEN KRİTİK ALAN
-  contentArea: { flex: 1 }, 
-  tabContent: { paddingBottom: 100 }, // İçerideki ScrollView'ın sonuna boşluk ekler
-  innerContent: { 
+  mainScrollContent: { 
     padding: 15, 
-    width: '100%', 
+    paddingBottom: 80,
     maxWidth: Platform.OS === 'web' ? 800 : '100%', 
-    alignSelf: 'center' 
+    alignSelf: 'center', 
+    width: '100%' 
   },
-
   card: { backgroundColor: C.bgMid, borderRadius: R.lg, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: C.border },
   formTitle: { color: C.amber, fontWeight: '900', marginBottom: 12, fontSize: F.md },
   label: { color: C.txtSecond, fontSize: F.xs, marginBottom: 5, fontWeight: '700' },
@@ -325,6 +296,8 @@ const styles = StyleSheet.create({
   statCardHighlight: { backgroundColor: C.amber },
   statLabel: { fontSize: F.xs, fontWeight: '700', color: C.txtSecond },
   statValue: { fontSize: F.xl, fontWeight: '900', color: C.txtPrimary, marginTop: 4 },
+  pdfBtn: { backgroundColor: '#d32f2f', padding: 12, borderRadius: R.sm, marginBottom: 15, alignItems: 'center' },
+  pdfBtnTxt: { color: '#fff', fontWeight: '800' },
   paymentSection: { flexDirection: 'row', gap: 10, marginBottom: 15 },
   payBox: { flex: 1, padding: 12, borderRadius: R.md, borderWidth: 2, alignItems: 'center', backgroundColor: C.bgMid },
   payLabel: { fontSize: F.xs, fontWeight: '800', marginBottom: 4 },
