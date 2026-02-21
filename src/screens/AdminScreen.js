@@ -27,13 +27,9 @@ export default function AdminScreen() {
   return (
     <View style={styles.root}>
 
-      {/* SABİT TAB BAR */}
+      {/* TAB BAR */}
       <View style={styles.tabBar}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabBarContent}
-        >
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {TABS.map(t => (
             <TouchableOpacity
               key={t.key}
@@ -48,12 +44,11 @@ export default function AdminScreen() {
         </ScrollView>
       </View>
 
-      {/* TEK ANA SCROLL */}
+      {/* CONTENT */}
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={styles.mainScroll}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
       >
         <View style={styles.webContainer}>
           {activeTab === 'products'   && <ProductsTab />}
@@ -75,166 +70,27 @@ function ProductsTab() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
 
-  const [newName, setNewName] = useState('');
-  const [newPrice, setNewPrice] = useState('');
-  const [newCatId, setNewCatId] = useState(null);
-  const [editingId, setEditingId] = useState(null);
-
-  const load = useCallback(async () => {
+  const load = async () => {
     try {
       const [p, c] = await Promise.all([getProducts(), getCategories()]);
       setProducts(p);
       setCategories(c);
-      if (c.length > 0 && !newCatId) setNewCatId(c[0].id);
-    } catch (e) { Alert.alert('Hata', extractError(e)); }
+    } catch (e) { Alert.alert("Hata", extractError(e)); }
     finally { setLoading(false); }
-  }, [newCatId]);
-
-  useEffect(() => { load(); }, [load]);
-
-  const handleSave = async () => {
-    if (!newName.trim() || !newPrice || !newCatId) {
-      Alert.alert("Hata", "Lütfen isim, fiyat doldurun ve kategori seçin.");
-      return;
-    }
-    setSaving(true);
-    try {
-      const payload = {
-        name: newName.trim(),
-        price: parseFloat(newPrice).toFixed(2),
-        category: newCatId
-      };
-
-      if (editingId) {
-        await updateProduct(editingId, payload);
-        setProducts(prev => prev.map(p => p.id === editingId ? {...p, ...payload} : p));
-      } else {
-        const newProd = await createProduct(payload);
-        setProducts(prev => [...prev, newProd]);
-      }
-
-      setNewName('');
-      setNewPrice('');
-      setEditingId(null);
-
-    } catch (e) { Alert.alert('Hata', extractError(e)); }
-    finally { setSaving(false); }
   };
 
-  const startEdit = (p) => {
-    setEditingId(p.id);
-    setNewName(p.name);
-    setNewPrice(p.price.toString());
-    setNewCatId(p.category);
-  };
-
-  const handleDelete = (id) => {
-    Alert.alert('Ürünü Sil', 'Silmek istediğine emin misin?', [
-      { text: 'Vazgeç' },
-      {
-        text: 'SİL',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteProduct(id);
-            setProducts(prev => prev.filter(p => p.id !== id));
-          } catch (e) { Alert.alert('Hata', "Silinemedi."); }
-        }
-      }
-    ]);
-  };
+  useEffect(() => { load(); }, []);
 
   if (loading) return <Loader />;
 
   return (
     <>
-      <View style={styles.card}>
-        <Text style={styles.formTitle}>
-          {editingId ? "🎁 Ürünü Düzenle" : "🆕 Yeni Ürün Ekle"}
-        </Text>
-
-        <TextInput
-          style={styles.input}
-          placeholder="Ürün Adı"
-          value={newName}
-          onChangeText={setNewName}
-          placeholderTextColor={C.txtDim}
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Fiyat"
-          value={newPrice}
-          onChangeText={setNewPrice}
-          keyboardType="numeric"
-          placeholderTextColor={C.txtDim}
-        />
-
-        <Text style={styles.label}>Kategori Seç:</Text>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {categories.map(c => (
-            <TouchableOpacity
-              key={c.id}
-              onPress={() => setNewCatId(c.id)}
-              style={[
-                styles.catSelectBtn,
-                newCatId === c.id && styles.catSelectBtnActive
-              ]}
-            >
-              <Text style={[
-                styles.catSelectTxt,
-                newCatId === c.id && styles.catSelectTxtActive
-              ]}>
-                {c.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-          <TouchableOpacity
-            style={[styles.primaryBtn, { flex: 2 }]}
-            onPress={handleSave}
-            disabled={saving}
-          >
-            <Text style={styles.primaryBtnTxt}>
-              {editingId ? "GÜNCELLE" : "KAYDET"}
-            </Text>
-          </TouchableOpacity>
-
-          {editingId && (
-            <TouchableOpacity
-              style={[styles.primaryBtn, { flex: 1, backgroundColor: C.bgLight }]}
-              onPress={() => {
-                setEditingId(null);
-                setNewName('');
-                setNewPrice('');
-              }}
-            >
-              <Text style={[styles.primaryBtnTxt, { color: C.txtPrimary }]}>
-                İPTAL
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
       {products.map(p => (
         <View key={p.id} style={styles.itemCard}>
           <View style={{ flex: 1 }}>
             <Text style={styles.productName}>{p.name}</Text>
             <Text style={styles.priceAmt}>{fmt(p.price)}</Text>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity onPress={() => startEdit(p)}>
-              <Text style={{ fontSize: 22 }}>✏️</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleDelete(p.id)}>
-              <Text style={{ fontSize: 22 }}>🗑️</Text>
-            </TouchableOpacity>
           </View>
         </View>
       ))}
@@ -243,11 +99,104 @@ function ProductsTab() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                               OTHER TABS                                   */
+/*                               CATEGORIES TAB                               */
 /* -------------------------------------------------------------------------- */
-/* CategoriesTab, DailyTab, MonthlyTab, ReportCards, StatCard, Loader */
-/* SENİN ORİJİNAL KODUNLA AYNI — HİÇ DOKUNULMADI */
-/* (KISALTMAMAK İÇİN BURADA TEKRAR YAZILMADI — ORİJİNALİNİ AYNEN KORU) */
+
+function CategoriesTab() {
+  const [cats, setCats] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    try {
+      const data = await getCategories();
+      setCats(data);
+    } catch (e) { Alert.alert("Hata", extractError(e)); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  if (loading) return <Loader />;
+
+  return (
+    <>
+      {cats.map(c => (
+        <View key={c.id} style={styles.itemCard}>
+          <Text style={[styles.productName, { flex: 1 }]}>{c.name}</Text>
+        </View>
+      ))}
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                 DAILY TAB                                  */
+/* -------------------------------------------------------------------------- */
+
+function DailyTab() {
+  const [dateStr] = useState(todayStr());
+  const [report, setReport] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getDailyReport(dateStr);
+        setReport(data);
+      } catch (e) { Alert.alert("Hata", extractError(e)); }
+    })();
+  }, []);
+
+  if (!report) return <Loader />;
+
+  return (
+    <>
+      <StatCard label="TOPLAM" value={fmt(report.total_revenue)} />
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                MONTHLY TAB                                 */
+/* -------------------------------------------------------------------------- */
+
+function MonthlyTab() {
+  const now = new Date();
+  const [report, setReport] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getMonthlyReport(now.getFullYear(), now.getMonth() + 1);
+        setReport(data);
+      } catch (e) { Alert.alert("Hata", extractError(e)); }
+    })();
+  }, []);
+
+  if (!report) return <Loader />;
+
+  return (
+    <>
+      <StatCard label="TOPLAM" value={fmt(report.total_revenue)} />
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                 COMPONENTS                                 */
+/* -------------------------------------------------------------------------- */
+
+function StatCard({ label, value }) {
+  return (
+    <View style={styles.statCard}>
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statValue}>{value}</Text>
+    </View>
+  );
+}
+
+function Loader() {
+  return <ActivityIndicator size="large" color={C.amber} style={{ marginTop: 40 }} />;
+}
 
 /* -------------------------------------------------------------------------- */
 /*                                   STYLES                                   */
@@ -260,111 +209,31 @@ const styles = StyleSheet.create({
     backgroundColor: C.bgMid,
     borderBottomWidth: 1,
     borderColor: C.border,
-  },
-
-  tabBarContent: {
-    paddingHorizontal: 10,
     paddingVertical: 10,
-    gap: 8,
-  },
-
-  mainScroll: {
-    paddingBottom: 40,
-  },
-
-  webContainer: {
-    width: '100%',
-    alignSelf: 'center',
-    maxWidth: Platform.OS === 'web' ? 1100 : '100%',
-    paddingHorizontal: 15,
-    paddingTop: 15,
+    paddingHorizontal: 10
   },
 
   tab: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: R.full,
-    backgroundColor: C.bgLight
+    backgroundColor: C.bgLight,
+    marginRight: 8
   },
 
   tabActive: { backgroundColor: C.amber },
 
-  tabTxt: {
-    fontSize: F.sm,
-    fontWeight: '700',
-    color: C.txtSecond
-  },
+  tabTxt: { fontWeight: '700', color: C.txtSecond },
 
   tabTxtActive: { color: C.bgDark },
 
-  card: {
-    backgroundColor: C.bgMid,
-    borderRadius: R.lg,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: C.border
-  },
+  mainScroll: { paddingBottom: 40 },
 
-  formTitle: {
-    color: C.amber,
-    fontWeight: '900',
-    marginBottom: 12,
-    fontSize: F.md
-  },
-
-  label: {
-    color: C.txtSecond,
-    fontSize: F.xs,
-    marginBottom: 5,
-    fontWeight: '700'
-  },
-
-  input: {
-    backgroundColor: C.bgLight,
-    borderRadius: R.sm,
-    padding: 12,
-    color: C.txtPrimary,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: C.border
-  },
-
-  catSelectBtn: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: C.bgLight,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: C.border
-  },
-
-  catSelectBtnActive: {
-    backgroundColor: C.amber,
-    borderColor: C.amber
-  },
-
-  catSelectTxt: {
-    color: C.txtPrimary,
-    fontWeight: '600'
-  },
-
-  catSelectTxtActive: {
-    color: C.bgDark,
-    fontWeight: '800'
-  },
-
-  primaryBtn: {
-    backgroundColor: C.amber,
-    borderRadius: R.sm,
-    padding: 14,
-    alignItems: 'center'
-  },
-
-  primaryBtnTxt: {
-    color: C.bgDark,
-    fontWeight: '800'
+  webContainer: {
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 1100 : '100%',
+    alignSelf: 'center',
+    padding: 15
   },
 
   itemCard: {
@@ -372,25 +241,39 @@ const styles = StyleSheet.create({
     borderRadius: R.md,
     padding: 14,
     marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: C.border
   },
 
   productName: {
     color: C.txtPrimary,
-    fontWeight: '700',
-    fontSize: F.md
+    fontWeight: '700'
   },
 
   priceAmt: {
     color: C.amber,
-    fontWeight: '800',
-    fontSize: F.md
+    fontWeight: '800'
   },
-});
 
-function Loader() {
-  return <ActivityIndicator color={C.amber} style={{ marginTop: 50 }} size="large" />;
-}
+  statCard: {
+    backgroundColor: C.bgMid,
+    borderRadius: R.lg,
+    padding: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: C.border
+  },
+
+  statLabel: {
+    fontSize: F.sm,
+    fontWeight: '700',
+    color: C.txtSecond
+  },
+
+  statValue: {
+    fontSize: F.xl,
+    fontWeight: '900',
+    color: C.txtPrimary,
+    marginTop: 4
+  }
+});
